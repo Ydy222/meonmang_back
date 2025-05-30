@@ -45,6 +45,12 @@ app.post("/subscribe", async (req, res) => {
     }
 
     try {
+        // 날짜 문자열 형식 변환
+        const formattedCreatedAt = new Date(createdAt)
+            .toISOString()
+            .slice(0, 19)
+            .replace("T", " "); // '2025-05-30 02:20:20'
+
         const [result] = await pool.query(
             `
                 INSERT INTO air_alert_subscriptions
@@ -66,15 +72,16 @@ app.post("/subscribe", async (req, res) => {
                 region,
                 item,
                 interval,
-                createdAt
+                formattedCreatedAt // ← 바뀐 부분
             ]
         );
 
         res.status(200).json({message: "구독 정보 저장 완료", result});
     } catch (err) {
-        console.error("DB 오류:", err);
+        console.error("❌ DB 오류:", err.message);
         res.status(500).json({error: "DB 처리 실패"});
     }
+
 });
 
 app.listen(8080, () => {
