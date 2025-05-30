@@ -76,7 +76,7 @@ app.post("/subscribe", async (req, res) => {
             );
         }
 
-        res.status(200).json({message: "구독 정보 저장 완료", result});
+        res.status(200).json({message: "구독 정보 저장 완료"});
     } catch (err) {
         console.error("❌ DB 오류:", err.message);
         res.status(500).json({error: "DB 처리 실패"});
