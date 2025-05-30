@@ -29,45 +29,53 @@ app.get("/", (req, res) => {
     res.send("서버 작동 중입니다.");
 });
 
+const axios = require("axios");
+
 app.post("/send", async (req, res) => {
-    const { title, body, url } = req.body;
-
-    if (!title || !body || !url) {
-        return res.status(400).json({ error: "title, body, url은 필수입니다." });
-    }
-
     try {
-        // DB에서 모든 구독자 정보 조회
-        const [rows] = await pool.query(
-            "SELECT endpoint, p256dh, auth FROM air_alert_subscriptions"
-        );
+        const [rows] = await pool.query(`
+            SELECT endpoint, p256dh, auth, region, item
+            FROM air_alert_subscriptions
+        `);
 
-        const notifications = rows.map((row) => {
-            const subscription = {
-                endpoint: row.endpoint,
-                keys: {
-                    p256dh: row.p256dh,
-                    auth: row.auth
-                }
-            };
+        const notifications = rows.map(async (row) => {
+            const { endpoint, p256dh, auth, region, item } = row;
 
-            const payload = JSON.stringify({
-                title,
-                body,
-                url
-            });
+            try {
+                // ⚠️ 외부 API 호출 (예: getCtprvnRltmMesureDnsty)
+                const serviceKey = process.env.AIRKOREA_API_KEY;
+                const apiUrl = `https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getCtprvnRltmMesureDnsty?serviceKey=${serviceKey}&returnType=json&sidoName=${encodeURIComponent(region)}&numOfRows=100&pageNo=1&ver=1.0`;
 
-            return webpush.sendNotification(subscription, payload).catch((err) => {
-                console.error("❌ 푸시 전송 실패:", err.message);
-                // 실패해도 서버 전체 중단 방지
-            });
+                const apiRes = await axios.get(apiUrl);
+                const items = apiRes.data.response.body.items;
+                const matched = items.find(i => i.stationName && i[item] !== undefined);
+
+                const value = matched?.[item] || "정보 없음";
+
+                const payload = JSON.stringify({
+                    title: `[${region}] ${item} 수치 알림`,
+                    body: `${region}의 ${item} 수치는 ${value}입니다.`,
+                    url: "/airdata"
+                });
+
+                const subscription = {
+                    endpoint,
+                    keys: { p256dh, auth }
+                };
+
+                await webpush.sendNotification(subscription, payload);
+
+            } catch (err) {
+                console.error(`❌ [${region}/${item}] 알림 실패:`, err.message);
+            }
         });
 
         await Promise.all(notifications);
 
-        res.status(200).json({ message: "✅ 모든 구독자에게 알림 발송 완료", count: rows.length });
+        res.status(200).json({ message: "✅ 알림 전송 완료", count: rows.length });
+
     } catch (err) {
-        console.error("❌ 알림 전송 오류:", err.message);
+        console.error("❌ 전체 알림 실패:", err.message);
         res.status(500).json({ error: "알림 전송 실패" });
     }
 });
