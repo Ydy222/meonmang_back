@@ -29,6 +29,50 @@ app.get("/", (req, res) => {
     res.send("서버 작동 중입니다.");
 });
 
+app.post("/send", async (req, res) => {
+    const { title, body, url } = req.body;
+
+    if (!title || !body || !url) {
+        return res.status(400).json({ error: "title, body, url은 필수입니다." });
+    }
+
+    try {
+        // DB에서 모든 구독자 정보 조회
+        const [rows] = await pool.query(
+            "SELECT endpoint, p256dh, auth FROM air_alert_subscriptions"
+        );
+
+        const notifications = rows.map((row) => {
+            const subscription = {
+                endpoint: row.endpoint,
+                keys: {
+                    p256dh: row.p256dh,
+                    auth: row.auth
+                }
+            };
+
+            const payload = JSON.stringify({
+                title,
+                body,
+                url
+            });
+
+            return webpush.sendNotification(subscription, payload).catch((err) => {
+                console.error("❌ 푸시 전송 실패:", err.message);
+                // 실패해도 서버 전체 중단 방지
+            });
+        });
+
+        await Promise.all(notifications);
+
+        res.status(200).json({ message: "✅ 모든 구독자에게 알림 발송 완료", count: rows.length });
+    } catch (err) {
+        console.error("❌ 알림 전송 오류:", err.message);
+        res.status(500).json({ error: "알림 전송 실패" });
+    }
+});
+
+
 // 프론트에서 전달한 푸시 구독 정보 + 사용자의 설정 정보를 DB에 저장
 app.post("/subscribe", async (req, res) => {
     const {
