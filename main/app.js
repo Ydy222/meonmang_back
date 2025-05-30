@@ -1,3 +1,5 @@
+const {REGION_KR_MAP, ITEM_KR_MAP} = require("./card");
+
 require("dotenv").config();
 
 const webpush = require("web-push");
@@ -15,6 +17,7 @@ const path = require("path");
 const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
 const axios = require("axios");
+const {response} = require("express");
 
 const app = express();
 
@@ -47,39 +50,31 @@ app.post("/subscribe", async (req, res) => {
     }
 
     try {
-        // 날짜 문자열 형식 변환
-        const formattedCreatedAt = new Date(createdAt)
-            .toISOString()
-            .slice(0, 19)
-            .replace("T", " "); // '2025-05-30 02:20:20'
+        const formattedCreatedAt = new Date(createdAt).toISOString().slice(0, 19).replace("T", " ");
 
-        const [result] = await pool.query(
-            `
-                INSERT INTO air_alert_subscriptions
-                (client_id, endpoint, p256dh, auth, region, item, am_pm, hour, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON DUPLICATE KEY UPDATE
-                                         endpoint = VALUES(endpoint),
-                                         p256dh = VALUES(p256dh),
-                                         auth = VALUES(auth),
-                                         region = VALUES(region),
-                                         item = VALUES(item),
-                                         am_pm = VALUES(am_pm),
-                                         hour = VALUES(hour),
-                                         updated_at = CURRENT_TIMESTAMP
-            `,
-            [
-                clientId,
-                sub.endpoint,
-                sub.keys.p256dh,
-                sub.keys.auth,
-                region,
-                item,
-                ampm,
-                hour,
-                formattedCreatedAt
-            ]
+        // 1️⃣ 존재 여부 확인
+        const [existing] = await pool.query(
+            "SELECT id FROM air_alert_subscriptions WHERE client_id = ? AND item = ?",
+            [clientId, item]
         );
+
+        if (existing.length > 0) {
+            // 2️⃣ UPDATE
+            await pool.query(
+                `UPDATE air_alert_subscriptions
+         SET endpoint=?, p256dh=?, auth=?, region=?, am_pm=?, hour=?, updated_at=NOW()
+         WHERE client_id=? AND item=?`,
+                [sub.endpoint, sub.keys.p256dh, sub.keys.auth, region, ampm, hour, clientId, item]
+            );
+        } else {
+            // 3️⃣ INSERT
+            await pool.query(
+                `INSERT INTO air_alert_subscriptions
+         (client_id, endpoint, p256dh, auth, region, item, am_pm, hour, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [clientId, sub.endpoint, sub.keys.p256dh, sub.keys.auth, region, item, ampm, hour, formattedCreatedAt]
+            );
+        }
 
         res.status(200).json({message: "구독 정보 저장 완료", result});
     } catch (err) {
@@ -102,16 +97,24 @@ app.post("/send", async (req, res) => {
 
             try {
                 const serviceKey = process.env.AIRKOREA_API_KEY;
-                const apiUrl = `https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getCtprvnRltmMesureDnsty?serviceKey=${serviceKey}&returnType=json&sidoName=${encodeURIComponent(region)}&numOfRows=100&pageNo=1&ver=1.0`;
+                const apiUrl = `http://apis.data.go.kr/B552584/ArpltnStatsSvc/getCtprvnMesureLIst?itemCode=${item}&dataGubun=HOUR&pageNo=1&numOfRows=100&returnType=json&serviceKey=${serviceKey}`;
 
                 const apiRes = await axios.get(apiUrl);
                 const items = apiRes.data.response.body.items;
-                const matched = items.find(i => i.stationName && i[item] !== undefined);
-                const value = matched?.[item] || "정보 없음";
+
+                console.log('items[0]',items[0]);
+                console.log('items[0][region]');
+                console.log(items[0][region]);
+                console.log('region');
+                console.log(region);
+
+                const regionKr = REGION_KR_MAP[region] || region;
+                const itemKr = ITEM_KR_MAP[item] || item;
+                const value = items[0][region] || "정보 없음";
 
                 const payload = JSON.stringify({
-                    title: `[${region}] ${item} 수치 알림`,
-                    body: `${region}의 ${item} 수치는 ${value}입니다.`,
+                    title: `[${regionKr}] ${itemKr} 알림`,
+                    body: `${regionKr}의 ${itemKr} 수치는 ${value}입니다.`,
                     url: "/airdata"
                 });
 
