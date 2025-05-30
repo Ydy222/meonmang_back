@@ -11,8 +11,6 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
-  "devDependencies": {
-  },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.8",
     "cookie-parser": "^1.4.7",
@@ -21,8 +19,8 @@
     "express": "^5.1.0",
     "express-session": "^1.18.1",
     "morgan": "^1.10.0",
-    "mysql2": "^3.14.1",
-    "web-push": "^3.6.7",
-    "nodemon": "^3.1.10"
+    "mysql2": "^3.3.3",
+    "nodemon": "^3.1.10",
+    "web-push": "^3.6.7"
   }
 }
