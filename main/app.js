@@ -1,5 +1,7 @@
 require("dotenv").config();
+
 const webpush = require("web-push");
+
 webpush.setVapidDetails(
     "mailto:kimyoott@naver.com",
     "BLbnwaj6jGwQgm7uH4Vu_5c_IW2lT0VXruGAwx4BTiiJ1rgvTv7bCjo1DL0q8ukDxv9TFLWa5eV__c7BvaTcqM0",
@@ -15,14 +17,15 @@ const cookieParser = require("cookie-parser");
 
 const app = express();
 
+// 미들웨어
 app.use(morgan("tiny"));
 app.use(cors());
-// 해당하는 파일이 있을때는 res.sendFile(), next()
 app.use("/images", express.static(path.join(__dirname, "public")));
 app.use(express.json());
 app.use(express.urlencoded({extended: false}));
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
+// 프론트에서 전달한 푸시 구독 정보 + 사용자의 설정 정보를 DB에 저장
 app.post("/subscribe", async (req, res) => {
     const {
         sub,
