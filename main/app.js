@@ -25,6 +25,10 @@ app.use(express.json());
 app.use(express.urlencoded({extended: false}));
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
+app.get("/", (req, res) => {
+    res.send("서버 작동 중입니다.");
+});
+
 // 프론트에서 전달한 푸시 구독 정보 + 사용자의 설정 정보를 DB에 저장
 app.post("/subscribe", async (req, res) => {
     const {
