@@ -23,7 +23,12 @@ const app = express();
 
 // 미들웨어
 app.use(morgan("tiny"));
-app.use(cors());
+app.use(cors({
+    origin: "https://meonmang.vercel.app",
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+}));
 app.use("/images", express.static(path.join(__dirname, "public")));
 app.use(express.json());
 app.use(express.urlencoded({extended: false}));
