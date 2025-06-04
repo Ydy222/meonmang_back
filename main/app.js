@@ -29,6 +29,7 @@ app.use(cors({
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
 }));
+app.options("*", cors());
 app.use("/images", express.static(path.join(__dirname, "public")));
 app.use(express.json());
 app.use(express.urlencoded({extended: false}));
